@@ -9,6 +9,17 @@ local spells = {
     ['elder druid'] = 'demonic surge'
 }
 
+local vocationColors = {
+    ['knight'] = '#A52A2A', -- Brązowy
+    ['elite knight'] = '#8B0000', -- Ciemnoczerwony
+    ['sorcerer'] = '#FF0000', -- Czerwony
+    ['master sorcerer'] = '#8B008B', -- Fioletowy
+    ['paladin'] = '#FFFF00', -- Żółty
+    ['royal paladin'] = '#FFD700', -- Złoty
+    ['druid'] = '#008000', -- Zielony
+    ['elder druid'] = '#006400' -- Ciemnozielony
+}
+
 local vocationList = {
     {name = "Knight", value = "knight"},
     {name = "Elite Knight", value = "elite knight"},
@@ -24,28 +35,13 @@ local selectedVocation = storage.vocation or string.lower(player:getVocation())
 local defaultSpell = spells[selectedVocation] or 'exura'
 local spell = storage.spell or defaultSpell
 
-local distance = tonumber(storage.distance) or 12
 local lastCastTime = 0
 local targetMonsters = {
-    "Rokita",
-    "Boruta",
-    "Bekart Wojny",
-    "Earth Stone",
-    "Ice Stone",
-    "Fire Stone",
-    "Meteo",
-    "Demoniczny Pomiot",
-    "Tyran",
-    "Clockwork",
-    "Young Earth Stone",
-    "Young Fire Stone",
-    "Young Ice Stone",
-    "Trener"
+    "Rokita", "Boruta", "Bekart Wojny", "Earth Stone", "Ice Stone", 
+    "Fire Stone", "Meteo", "Demoniczny Pomiot", "Tyran", "Clockwork",
+    "Young Earth Stone", "Young Fire Stone", "Young Ice Stone",
+    "Fardos", "Trener"
 }
-
-addTextEdit("distance", storage.distance or "12", function(widget, text)
-    storage.distance = text
-end)
 
 local panel = setupUI([[  
 Panel  
@@ -54,7 +50,8 @@ Panel
     type: verticalBox  
     fit-children: true  
   Label  
-    text: Wybierz profesję  
+    id: vocLabel
+    text: Wybierz profesje  
     text-align: center  
     margin-top: 6  
   ComboBox  
@@ -63,16 +60,27 @@ Panel
     margin: 3  
 ]])
 
+local playerVoc = panel:getChildById("playerVoc")
+local vocLabel = panel:getChildById("vocLabel") -- Pobranie etykiety
+
 for _, voc in ipairs(vocationList) do
-    panel.playerVoc:addOption(voc.name, voc.value)
+    playerVoc:addOption(voc.name, voc.value)
 end
 
-panel.playerVoc:setCurrentOption(selectedVocation)
-panel.playerVoc.onOptionChange = function(widget)
+local function updateColors()
+    local color = vocationColors[selectedVocation] or '#FFFFFF' -- Domyślnie biały
+    vocLabel:setColor(color) -- Zmiana koloru etykiety
+end
+
+playerVoc:setCurrentOptionByData(selectedVocation) -- ✅ Ustawia zapamiętaną profesję w ComboBox
+updateColors() -- ✅ Aktualizuje kolor od razu po załadowaniu
+
+playerVoc.onOptionChange = function(widget)
     storage.vocation = widget:getCurrentOption().data
     selectedVocation = storage.vocation
     spell = spells[selectedVocation] or 'exura'
     storage.spell = spell
+    updateColors()
 end
 
 addTextEdit("spell", storage.spell or defaultSpell, function(widget, text)
@@ -83,23 +91,22 @@ end)
 macro(50, "EVENTY", function()
     if isInPz() then return end
     if os.time() - lastCastTime < 0.2 then return end
-    
+
     local validMonsters = {}
     local currentTarget = g_game.getAttackingCreature()
-    
-    for _, creature in pairs(getSpectators()) do
-        if creature:isMonster() and creature:canShoot() then
-            local dist = getDistanceBetween(player:getPosition(), creature:getPosition())
-            if dist <= distance then
-                for _, targetName in ipairs(targetMonsters) do
-                    if creature:getName() == targetName then
-                        table.insert(validMonsters, creature)
-                    end
+
+    for _, creature in ipairs(getSpectators()) do
+        if creature:isMonster() then
+            local creatureName = creature:getName()
+            for _, targetName in ipairs(targetMonsters) do
+                if creatureName == targetName then
+                    table.insert(validMonsters, creature)
+                    break
                 end
             end
         end
     end
-    
+
     if #validMonsters > 0 then
         local weakest = validMonsters[1]
         for _, mob in ipairs(validMonsters) do
